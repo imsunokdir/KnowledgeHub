@@ -5,6 +5,7 @@ import { Login } from "@mui/icons-material";
 import { Dropdown, Space, message } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { logout } from "../api/user";
+import ArticleIcon from "@mui/icons-material/Article";
 
 const Header = () => {
   const { user, isAuth, setUser } = authContext();
@@ -48,12 +49,12 @@ const Header = () => {
   const items = [
     isAuth && {
       label: (
-        <a className="no-underline" onClick={() => {}}>
-          Change Password
+        <a className="no-underline" onClick={() => navigate("/document")}>
+          Create Document
         </a>
       ),
-      key: "0",
-      icon: <Avatar sx={{ width: 20, height: 20 }} />,
+      key: "create-doc",
+      icon: <ArticleIcon sx={{ width: 20, height: 20 }} />,
     },
     isAuth
       ? {
@@ -62,7 +63,7 @@ const Header = () => {
               Logout
             </a>
           ),
-          key: "1",
+          key: "logout",
           icon: <Login sx={{ width: 18, height: 18 }} />,
         }
       : {
@@ -71,7 +72,7 @@ const Header = () => {
               Login/Register
             </a>
           ),
-          key: "1",
+          key: "login",
           icon: <Login sx={{ width: 18, height: 18 }} />,
         },
   ];
@@ -84,14 +85,14 @@ const Header = () => {
   return (
     <>
       {contextHolder} {/* Important for AntD message */}
-      <header className="bg-blue-500 shadow-md p-4">
+      <header className="bg-blue-500 shadow-md p-4 fixed top-0 left-0 w-full z-50">
         <nav className="container mx-auto flex justify-between items-center">
           {/* Left side: Logo + Navigation button */}
           <div className="flex items-center space-x-4">
             <div>{/* Logo placeholder */}</div>
             {isAuth && (
               <button
-                onClick={() => navigate(navButtonTarget, { replace: true })}
+                onClick={() => navigate(navButtonTarget)}
                 className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all duration-200 font-medium"
               >
                 {navButtonLabel}

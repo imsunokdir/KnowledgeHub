@@ -1,38 +1,119 @@
+// src/components/DocsList.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocs } from "../context/DocsContext";
 import DocCard from "./DocCard";
+import DocCardSkeleton from "./DocCardSkeleton";
 
 const DocsList = () => {
   const {
     documents,
-    searchMode,
+    filteredDocuments,
     searchResults,
+    searchMode,
+    localFilterActive,
     currentSearch,
-    page,
-    setPage,
-    totalPages,
     loading,
+    documentsLoading,
+    searchLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    handleLoadMore,
     handleClearSearch,
+    clearLocalFilter,
+    documentsError,
+    searchError,
   } = useDocs();
 
   const navigate = useNavigate();
-  const currentDocuments = searchMode ? searchResults : documents;
+
+  // Determine which documents to display
+  const currentDocuments = searchMode
+    ? searchResults
+    : localFilterActive
+    ? filteredDocuments
+    : documents;
+
+  // Handle errors
+  if (documentsError && !searchMode) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+        <div className="p-8 text-center">
+          <div className="text-red-500 mb-4">
+            <svg
+              className="mx-auto h-16 w-16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+            Failed to load documents
+          </h3>
+          <p className="text-slate-600 text-sm">{documentsError.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (searchError && searchMode) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+        <div className="p-8 text-center">
+          <div className="text-red-500 mb-4">
+            <svg
+              className="mx-auto h-16 w-16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+            Search failed
+          </h3>
+          <p className="text-slate-600 text-sm">{searchError.message}</p>
+          <button
+            onClick={handleClearSearch}
+            className="mt-4 px-4 py-2 text-slate-600 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all duration-200 font-medium"
+          >
+            Clear Search
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Content Header */}
+      {/* Header */}
       <div className="border-b border-slate-200 p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900 mb-1">
-              {searchMode ? "Search Results" : "All Documents"}
+              {searchMode
+                ? "Search Results"
+                : localFilterActive
+                ? "Filtered Documents"
+                : "All Documents"}
             </h2>
             <div className="flex items-center space-x-3 text-sm text-slate-600">
               {searchMode && currentSearch && (
                 <>
-                  <span>Query: "{currentSearch.query}"</span>
-                  <span>•</span>
+                  Query: "{currentSearch.query}" •{" "}
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
                       currentSearch.type === "semantic"
@@ -44,9 +125,9 @@ const DocsList = () => {
                       ? "AI Search"
                       : "Text Search"}
                   </span>
-                  <span>•</span>
                 </>
               )}
+              {localFilterActive && <span>Local filters applied</span>}
               <span>
                 {currentDocuments.length} document
                 {currentDocuments.length !== 1 ? "s" : ""}
@@ -54,70 +135,51 @@ const DocsList = () => {
             </div>
           </div>
 
-          {searchMode && (
+          {(searchMode || localFilterActive) && (
             <button
-              onClick={handleClearSearch}
+              onClick={searchMode ? handleClearSearch : clearLocalFilter}
               className="px-4 py-2 text-slate-600 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all duration-200 font-medium"
             >
-              Clear Search
+              {searchMode ? "Clear Search" : "Clear Filter"}
             </button>
           )}
         </div>
       </div>
 
-      {/* Documents Grid */}
-      <div className="p-6">
-        {loading && currentDocuments.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
-            <span className="text-slate-600">
-              {searchMode ? "Searching documents..." : "Loading documents..."}
-            </span>
+      {/* Document List */}
+      <div className="divide-y divide-slate-100">
+        {loading && !isFetchingNextPage && currentDocuments.length === 0 ? (
+          // Initial loading state
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <DocCardSkeleton key={idx} />
+            ))}
           </div>
-        ) : currentDocuments.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4 opacity-20">
-              {searchMode ? "🔍" : "📄"}
-            </div>
-            <h3 className="text-lg font-medium text-slate-600 mb-2">
-              {searchMode ? "No search results found" : "No documents found"}
-            </h3>
-            <p className="text-slate-500">
-              {searchMode
-                ? "Try adjusting your search terms or using a different search type"
-                : "Create your first document to get started"}
-            </p>
-            {searchMode && (
-              <button
-                onClick={handleClearSearch}
-                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all duration-200"
-              >
-                View All Documents
-              </button>
-            )}
+        ) : currentDocuments.length > 0 ? (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentDocuments.map((doc) => (
+              <DocCard key={doc._id} doc={doc} />
+            ))}
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {currentDocuments.map((doc, index) => (
-                <DocCard doc={doc} />
-              ))}
-            </div>
-
-            {/* Load More Button */}
-            {!searchMode && page < totalPages && (
-              <div className="flex justify-center mt-6">
-                <button
-                  onClick={() => setPage(page + 1)}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all duration-200"
-                >
-                  {loading ? "Loading..." : "Load More"}
-                </button>
-              </div>
-            )}
-          </>
+          <div className="p-12 text-center text-slate-500">
+            No documents found.
+          </div>
         )}
       </div>
+
+      {/* Load More Button */}
+      {hasNextPage && (
+        <div className="p-6 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={isFetchingNextPage}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+          >
+            {isFetchingNextPage ? "Loading..." : "Load More"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

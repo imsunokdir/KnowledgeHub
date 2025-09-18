@@ -40,3 +40,24 @@ export const getRecentEdits = async () =>
   await axiosInstance.get(`/document/activity/recent`, {
     withCredentials: true,
   });
+export const getRecentDocEdits = async (docId) =>
+  await axiosInstance.get(`/document/activity/recent/${docId}`, {
+    withCredentials: true,
+  });
+
+export const getMyDocuments = async () =>
+  await axiosInstance.get(`/document/my-documents`, {
+    withCredentials: true,
+  });
+
+// src/api/document.js
+export const addMember = async (documentId, { email, role }) => {
+  return await axiosInstance.post(
+    `/document/${documentId}/add-member`,
+    {
+      email,
+      role,
+    },
+    { withCredentials: true }
+  );
+};

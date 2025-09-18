@@ -11,6 +11,9 @@ const {
   getDocumentVersions,
   generateSummaryForDoc,
   generateTagsForDoc,
+  getRecentEditsForDoc,
+  getMyDocuments,
+  addMember,
 } = require("../controllers/document.controller");
 
 const docRouter = express.Router();
@@ -32,8 +35,10 @@ docRouter.put("/:id", updateDocument);
 // DELETE a document by ID (owner or admin)
 docRouter.delete("/:id", deleteDocument);
 
-// recent activity feed
+// recent team activity feed
 docRouter.get("/activity/recent", getRecentEdits);
+// recent document activity feed
+docRouter.get("/activity/recent/:docId", getRecentEditsForDoc);
 
 // versions for a doc
 docRouter.get("/:id/history", getDocumentVersions);
@@ -43,5 +48,11 @@ docRouter.post("/:id/summarize", generateSummaryForDoc);
 
 // GENERATE tags for a doc
 docRouter.post("/:id/generate-tags", generateTagsForDoc);
+
+//GET My documnets
+docRouter.get("/my-documnents", getMyDocuments);
+
+// ADD Member
+docRouter.post("/:documentId/add-member", addMember);
 
 module.exports = docRouter;

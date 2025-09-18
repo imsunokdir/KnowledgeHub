@@ -1,25 +1,42 @@
 import { useState } from "react";
 import { authContext } from "../../context/AuthProvider";
 import { createDoc } from "../../api/document";
-import { logout } from "../../api/user";
 import { useNavigate } from "react-router-dom";
-import SemanticSearch from "../SemanticSearch";
-import AskQuestion from "../AskQuestion";
-import Search from "../Search";
-// import { createDocument } from "../../src/api/document";
-// import { authContext } from "../../context/AuthProvider";
+
+import {
+  Box,
+  Card,
+  CardContent,
+  CardHeader,
+  TextField,
+  Typography,
+  Button,
+  Alert,
+} from "@mui/material";
 
 const CreateDocument = () => {
-  const { isAuth, setUser } = authContext();
+  const { isAuth } = authContext();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: "",
     content: "",
   });
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   if (!isAuth) {
-    return <p>You must be logged in to create a document.</p>;
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="70vh"
+      >
+        <Typography variant="h6" color="textSecondary">
+          You must be logged in to create a document.
+        </Typography>
+      </Box>
+    );
   }
 
   const handleChange = (e) => {
@@ -28,63 +45,79 @@ const CreateDocument = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage("");
+    setError("");
+
     try {
       const res = await createDoc(formData);
       if (res.status === 201) {
         setMessage("Document created successfully!");
         setFormData({ title: "", content: "" });
-        console.log("Created document:", res.data);
         navigate(`/document/${res.data._id}`);
       }
-    } catch (error) {
-      console.error("Error creating document:", error);
-      setMessage("Failed to create document.");
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      const res = await logout();
-      if (res.status === 200) {
-        setUser(null);
-      }
-    } catch (error) {
-      console.log("logout error:", error);
+    } catch (err) {
+      console.error("Error creating document:", err);
+      setError("Failed to create document. Please try again.");
     }
   };
 
   return (
-    <div>
-      <h2>Create Document</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Title:</label>
-          <input
-            type="text"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div>
-          <label>Content:</label>
-          <textarea
-            name="content"
-            value={formData.content}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <button type="submit">Create</button>
-      </form>
-      {message && <p>{message}</p>}
-      {isAuth && <button onClick={handleLogout}>Logout</button>}
+    <Box display="flex" justifyContent="center" mt={6}>
+      <Card
+        sx={{ width: "100%", maxWidth: 600, boxShadow: 3, borderRadius: 3 }}
+      >
+        <CardHeader
+          title="Create Document"
+          titleTypographyProps={{ variant: "h5", fontWeight: 600 }}
+        />
+        <CardContent>
+          <form onSubmit={handleSubmit}>
+            <Box mb={2}>
+              <TextField
+                label="Title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                required
+                fullWidth
+              />
+            </Box>
+            <Box mb={2}>
+              <TextField
+                label="Content"
+                name="content"
+                value={formData.content}
+                onChange={handleChange}
+                required
+                fullWidth
+                multiline
+                rows={6}
+              />
+            </Box>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              fullWidth
+              sx={{ py: 1.2, fontWeight: "bold" }}
+            >
+              Create
+            </Button>
+          </form>
 
-      {/* <SemanticSearch /> */}
-      {/* <AskQuestion /> */}
-      <Search />
-    </div>
+          {message && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              {message}
+            </Alert>
+          )}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 

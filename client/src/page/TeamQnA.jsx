@@ -1,12 +1,17 @@
-// src/pages/TeamQnA.jsx
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTeamQnA } from "../context/TeamQnAContext";
 import { askQuestion } from "../api/qa";
 
 const TeamQnA = () => {
-  const [question, setQuestion] = useState("");
-  const [answerData, setAnswerData] = useState(null); // { answer, context: [{_id, title, content, similarity}] }
-  const [loading, setLoading] = useState(false);
+  const {
+    question,
+    setQuestion,
+    answerData,
+    setAnswerData,
+    loading,
+    setLoading,
+  } = useTeamQnA();
   const navigate = useNavigate();
 
   const handleAsk = async () => {
@@ -15,13 +20,9 @@ const TeamQnA = () => {
     setLoading(true);
     try {
       const res = await askQuestion(question);
-      console.log("Q&A response:", res);
-
       setAnswerData(res.data);
-
-      setQuestion("");
     } catch (err) {
-      console.error("Q&A error:", err);
+      console.error(err);
       setAnswerData({
         answer: "⚠️ Something went wrong while fetching the answer.",
         context: [],
@@ -35,9 +36,6 @@ const TeamQnA = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow p-6">
         <h1 className="text-3xl font-bold text-slate-900 mb-4">Team Q&A</h1>
-        <p className="text-slate-600 mb-6">
-          Ask a question, and Gemini will answer based on your team’s documents.
-        </p>
 
         {/* Input */}
         <div className="flex space-x-3 mb-6">
@@ -58,7 +56,7 @@ const TeamQnA = () => {
           </button>
         </div>
 
-        {/* Answer with Context */}
+        {/* Answer + Context */}
         {answerData && (
           <div className="mb-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
             <h2 className="font-semibold text-slate-800 mb-2">
@@ -68,7 +66,7 @@ const TeamQnA = () => {
               A: {answerData.answer}
             </p>
 
-            {answerData.context && answerData.context.length > 0 && (
+            {answerData.context?.length > 0 && (
               <div>
                 <h3 className="font-semibold text-slate-800 mb-2">
                   Context from documents:

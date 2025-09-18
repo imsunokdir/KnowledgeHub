@@ -10,6 +10,14 @@ import {
 } from "../api/document";
 import TeamActivityFeed from "../components/TeamActivityFeed";
 import HistoryModal from "../components/HistoryModal";
+import {
+  connectSocket,
+  joinDocumentRoom,
+  subscribeToDocumentUpdates,
+} from "../api/socket";
+import { message } from "antd";
+import DocActivityFeed from "../components/DocActivityFeed";
+import AddMemberForm from "../components/AddMemberForm";
 
 const DocumentDetailsPage = () => {
   const { id } = useParams();
@@ -23,24 +31,59 @@ const DocumentDetailsPage = () => {
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [versions, setVersions] = useState([]);
+  const [aiErrorMessage, setAiErrorMessage] = useState("");
+  const [msgApi, contextHolder] = message.useMessage();
 
   const fetchDoc = async () => {
     try {
       const res = await getDocument(id);
+      console.log("docs:", res);
       setDoc(res.data);
       setTitle(res.data.title);
       setContent(res.data.content);
     } catch (err) {
       console.error(err);
       if (err.response?.status === 404) {
-        alert("Document not found");
+        msgApi.error("Document not found");
         nav("/documents");
+      } else {
+        msgApi.error("Failed to fetch document");
       }
     }
   };
 
   useEffect(() => {
     fetchDoc();
+
+    // Join document room for real-time updates
+    joinDocumentRoom(id);
+
+    // Subscribe to document updates
+    subscribeToDocumentUpdates((updatedDoc) => {
+      console.log("📩 Received document update:", updatedDoc);
+
+      setDoc((prev) => ({
+        ...prev,
+        ...updatedDoc, // merge updated fields (summary, tags, aiStatus)
+      }));
+
+      // Stop loading states when AI operations complete
+      if (updatedDoc.aiStatus === "completed") {
+        setIsSummarizing(false);
+        setIsGeneratingTags(false);
+      } else if (updatedDoc.aiStatus === "failed") {
+        setIsSummarizing(false);
+        setIsGeneratingTags(false);
+        console.error("❌ AI operation failed:", updatedDoc);
+        msgApi.error("AI operation failed. Please try again.");
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      const socket = connectSocket();
+      socket.off("documentUpdated");
+    };
     // eslint-disable-next-line
   }, [id]);
 
@@ -50,9 +93,10 @@ const DocumentDetailsPage = () => {
       const res = await updateDocument(id, { title, content });
       setDoc(res.data.doc || res.data);
       setEditing(false);
+      msgApi.success("Document saved successfully");
     } catch (err) {
       console.error(err);
-      alert("Save failed");
+      msgApi.error("Save failed");
     } finally {
       setLoading(false);
     }
@@ -60,33 +104,28 @@ const DocumentDetailsPage = () => {
 
   const handleSummarize = async () => {
     setIsSummarizing(true);
+
     try {
       const res = await summarizeDocument(id);
-      if (res.status === 200) {
-        console.log("sum gen:", res);
-        if (res.data.doc) setDoc(res.data.doc);
-        else if (res.data.summary)
-          setDoc((d) => ({ ...d, summary: res.data.summary }));
-      }
-      // res.data.doc or res.data.summary depending on server response
+      // Note: The actual update will come via socket, so we don't need to update state here
+      console.log("Summary request sent:", res);
     } catch (err) {
-      console.error(err);
-      alert("Summary generation failed");
-    } finally {
+      console.error("Summary generation failed:", err);
+      msgApi.error("Summary generation failed. Please try again.");
       setIsSummarizing(false);
     }
   };
 
   const handleGenerateTags = async () => {
     setIsGeneratingTags(true);
+    setAiErrorMessage("");
     try {
       const res = await generateTagsDocument(id);
-      if (res.data.doc) setDoc(res.data.doc);
-      else if (res.data.tags) setDoc((d) => ({ ...d, tags: res.data.tags }));
+      // Note: The actual update will come via socket, so we don't need to update state here
+      console.log("Tags generation request sent:", res);
     } catch (err) {
-      console.error(err);
-      alert("Tag generation failed");
-    } finally {
+      console.error("Tag generation failed:", err);
+      msgApi.error("Tag generation failed. Please try again.");
       setIsGeneratingTags(false);
     }
   };
@@ -98,9 +137,52 @@ const DocumentDetailsPage = () => {
       setShowHistory(true);
     } catch (err) {
       console.error(err);
-      alert("Failed to load history");
+      msgApi.error("Failed to load history");
     }
   };
+
+  // Loading skeleton components
+  const SummarySkeleton = () => (
+    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 animate-pulse">
+      <div className="flex items-center space-x-2 mb-3">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+        <span className="text-slate-600 text-sm font-medium">
+          Generating summary...
+        </span>
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 bg-slate-200 rounded w-full"></div>
+        <div className="h-4 bg-slate-200 rounded w-4/5"></div>
+        <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+      </div>
+    </div>
+  );
+
+  const TagsSkeleton = () => (
+    <div className="animate-pulse">
+      <div className="flex items-center space-x-2 mb-3">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+        <span className="text-slate-600 text-sm font-medium">
+          Generating tags...
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-8 bg-slate-200 rounded-full"
+            style={{ width: `${60 + i * 15}px` }}
+          ></div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Check if AI operations are pending
+  const isSummaryPending =
+    doc?.aiStatus === "pending" && doc?.summary === undefined;
+  const isTagsPending =
+    doc?.aiStatus === "pending" && (!doc?.tags || doc.tags.length === 0);
 
   if (!doc)
     return (
@@ -118,6 +200,7 @@ const DocumentDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {contextHolder}
       <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Main Content Area */}
         <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -137,14 +220,6 @@ const DocumentDetailsPage = () => {
                     placeholder="Document title..."
                   />
                 )}
-                {/* <div className="flex items-center text-sm text-slate-500 space-x-2">
-                  <span className="font-medium text-slate-600">
-                    Created by:
-                  </span>
-                  <span>{doc.createdBy?.name || "Unknown"}</span>
-                  <span>•</span>
-                  <span>{new Date(doc.createdAt).toLocaleString()}</span>
-                </div> */}
               </div>
 
               <div className="flex items-center gap-3 ml-6">
@@ -201,22 +276,24 @@ const DocumentDetailsPage = () => {
             <div className="flex gap-3 flex-wrap">
               <button
                 onClick={handleSummarize}
-                disabled={isSummarizing}
+                disabled={isSummarizing || isSummaryPending}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-sm flex items-center space-x-2"
               >
                 <span>✨</span>
                 <span>
-                  {isSummarizing ? "Generating..." : "Summarize with Gemini"}
+                  {isSummarizing || isSummaryPending
+                    ? "Generating..."
+                    : "Summarize with Gemini"}
                 </span>
               </button>
               <button
                 onClick={handleGenerateTags}
-                disabled={isGeneratingTags}
+                disabled={isGeneratingTags || isTagsPending}
                 className="px-5 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-sm flex items-center space-x-2"
               >
                 <span>🏷️</span>
                 <span>
-                  {isGeneratingTags
+                  {isGeneratingTags || isTagsPending
                     ? "Generating..."
                     : "Generate Tags with Gemini"}
                 </span>
@@ -231,12 +308,16 @@ const DocumentDetailsPage = () => {
                 <span>📝</span>
                 <span>Summary</span>
               </h3>
-              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {doc.summary ||
-                    "No summary generated yet. Use the AI tools above to create one."}
-                </p>
-              </div>
+              {isSummaryPending || isSummarizing ? (
+                <SummarySkeleton />
+              ) : (
+                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {doc.summary ||
+                      "No summary generated yet. Use the AI tools above to create one."}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -244,23 +325,27 @@ const DocumentDetailsPage = () => {
                 <span>🏷️</span>
                 <span>Tags</span>
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {(doc.tags || []).length > 0 ? (
-                  (doc.tags || []).map((t) => (
-                    <span
-                      key={t}
-                      className="px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium border border-indigo-200"
-                    >
-                      #{t}
+              {isTagsPending || isGeneratingTags ? (
+                <TagsSkeleton />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {(doc.tags || []).length > 0 ? (
+                    (doc.tags || []).map((t) => (
+                      <span
+                        key={t}
+                        className="px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium border border-indigo-200"
+                      >
+                        #{t}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-500 text-sm italic">
+                      No tags generated yet. Use the AI tools above to create
+                      some.
                     </span>
-                  ))
-                ) : (
-                  <span className="text-slate-500 text-sm italic">
-                    No tags generated yet. Use the AI tools above to create
-                    some.
-                  </span>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -268,7 +353,7 @@ const DocumentDetailsPage = () => {
         {/* Sidebar */}
         <aside className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <TeamActivityFeed />
+            <DocActivityFeed docId={id} />
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -283,6 +368,15 @@ const DocumentDetailsPage = () => {
               <span>📜</span>
               <span>Show Version History</span>
             </button>
+            <div className="mt-5">
+              <AddMemberForm
+                documentId={doc._id}
+                onMemberAdded={(updatedMembers) =>
+                  setDoc((prev) => ({ ...prev, members: updatedMembers }))
+                }
+                members={doc.members}
+              />
+            </div>
           </div>
         </aside>
       </div>

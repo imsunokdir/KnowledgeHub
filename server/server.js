@@ -9,12 +9,13 @@ const { Server } = require("socket.io");
 const http = require("http");
 const searchRouter = require("./routes/search.route");
 const qaRouter = require("./routes/qa.route");
+const userRouter = require("./routes/user.route");
 
 const app = express();
 
 // CORS setup - make it more explicit
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: process.env.FRONTEND,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
@@ -32,6 +33,7 @@ app.use("/auth", authRouter);
 app.use("/document", docRouter);
 app.use("/search", searchRouter);
 app.use("/qa", qaRouter);
+app.use("/user", userRouter);
 
 // create http server
 const server = http.createServer(app);
@@ -39,7 +41,7 @@ const server = http.createServer(app);
 // socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND,
     methods: ["GET", "POST"],
     credentials: true,
   },

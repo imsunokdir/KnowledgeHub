@@ -26,3 +26,8 @@ export const getUser = async () =>
 
 export const logout = async () =>
   await axiosInstance.post("/auth/logout", {}, { withCredentials: true });
+
+export const getUsers = async (search = "") =>
+  await axiosInstance.get("/user/get-users", {
+    params: { search },
+  });

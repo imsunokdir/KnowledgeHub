@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getRecentEdits } from "../api/document";
+import { getRecentDocEdits, getRecentEdits } from "../api/document";
 
-const TeamActivityFeed = () => {
+const DocActivityFeed = ({ docId }) => {
   const [items, setItems] = useState([]);
   const nav = useNavigate();
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const res = await getRecentEdits();
+        const res = await getRecentDocEdits(docId);
         setItems(res.data || []);
       } catch (err) {
         console.error("fetch recent edits:", err);
@@ -22,7 +22,7 @@ const TeamActivityFeed = () => {
     <div className="bg-white rounded-xl shadow-md border border-slate-200 p-4 w-full mt-5">
       <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center space-x-2 border-b border-slate-200 pb-2">
         <span className="text-indigo-600">👥</span>
-        <span>Team Activity Feed</span>
+        <span>Doc Activity Feed</span>
       </h4>
 
       <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -93,4 +93,4 @@ const TeamActivityFeed = () => {
   );
 };
 
-export default TeamActivityFeed;
+export default DocActivityFeed;
